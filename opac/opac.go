@@ -2,9 +2,10 @@ package opac
 
 import (
 	//"fmt"
-	"github.com/panthesingh/goson"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/panthesingh/goson"
 )
 
 type Hold struct {
@@ -16,7 +17,7 @@ type Hold struct {
 
 func Get(id string) []Hold {
 
-        hold_list := make([]Hold, 0)
+	hold_list := make([]Hold, 0)
 
 	json := get_json(id)
 
@@ -45,9 +46,9 @@ func Get(id string) []Hold {
 			Lib:      lib_name,
 			Location: loc_name,
 		}
-                hold_list = append(hold_list, h)
+		hold_list = append(hold_list, h)
 	}
-        return hold_list
+	return hold_list
 }
 
 func get_json(id string) []byte {
