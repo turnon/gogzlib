@@ -3,6 +3,7 @@ package opac
 import (
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -28,6 +29,18 @@ func Search(keyword string) {
 		panic(err)
 	}
 
+	getBookInfoWorkers, result := makeWorker(4)
+	allBooks := make([]book, 0)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		for b := range result {
+			allBooks = append(allBooks, b)
+		}
+		wg.Done()
+	}()
+
 	doc.Find(".bookmeta").Each(func(i int, s *goquery.Selection) {
 		bookrecno, exists := s.Attr("bookrecno")
 
@@ -35,11 +48,36 @@ func Search(keyword string) {
 			panic("no bookrecno")
 		}
 
-		b := book{No: i, Bookrecno: bookrecno}
-
-		b.getBookInfo()
-
-		fmt.Println(b)
+		getBookInfoWorkers <- book{No: i, Bookrecno: bookrecno}
 	})
 
+	close(getBookInfoWorkers)
+
+	wg.Wait()
+	fmt.Println(allBooks)
+
+}
+
+func makeWorker(n int) (chan book, chan book) {
+	in := make(chan book)
+	out := make(chan book)
+	var wg sync.WaitGroup
+	wg.Add(n)
+
+	for ; n > 0; n-- {
+		go func() {
+			for b := range in {
+				b.getBookInfo()
+				out <- b
+			}
+			wg.Done()
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	return in, out
 }
