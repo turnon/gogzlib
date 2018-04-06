@@ -8,20 +8,20 @@ import (
 	"github.com/panthesingh/goson"
 )
 
-// Hold is about book storage
-type Hold struct {
+type holding struct {
 	Callno   string
 	State    string
 	Lib      string
 	Location string
 }
 
-// Get by book id
-func Get(id string) []Hold {
+const holdURL = "http://opac.gzlib.gov.cn/opac/api/holding/"
 
-	holdList := make([]Hold, 0)
+func (b *book) checkHolding() {
 
-	json := getJSON(id)
+	b.holdings = make([]holding, 0)
+
+	json := getJSON(b.Bookrecno)
 
 	g, _ := goson.Parse(json)
 
@@ -42,19 +42,19 @@ func Get(id string) []Hold {
 		libCode := hold.Get("curlib").String()
 		libName := libMap.Get(libCode).String()
 
-		h := Hold{
+		h := holding{
 			Callno:   hold.Get("callno").String(),
 			State:    stateName,
 			Lib:      libName,
 			Location: locName,
 		}
-		holdList = append(holdList, h)
+
+		b.holdings = append(b.holdings, h)
 	}
-	return holdList
 }
 
 func getJSON(id string) []byte {
-	resp, err := http.Get("http://opac.gzlib.gov.cn/opac/api/holding/" + id)
+	resp, err := http.Get(holdURL + id)
 
 	if err != nil {
 		panic(err)

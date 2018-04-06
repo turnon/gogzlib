@@ -9,14 +9,16 @@ import (
 )
 
 type book struct {
+	No                                                     int
 	Bookrecno, Title, ISBN, PrimaryAuthor, SecondaryAuthor string
+	holdings                                               []holding
 }
 
 const bookURL = "http://opac.gzlib.gov.cn/opac/book/"
 
 var /* const */ isbnRegexp = regexp.MustCompile(`(?s)\n\s+价格.*`)
 
-func (b *book) getInfobook() {
+func (b *book) getBookInfo() {
 	resp, err := http.Get(bookURL + b.Bookrecno)
 
 	if err != nil {
@@ -39,6 +41,7 @@ func (b *book) getInfobook() {
 		}
 	})
 
+	b.checkHolding()
 }
 
 func infoOtherThanTitle(b *book, s *goquery.Selection) {
