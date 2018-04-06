@@ -14,6 +14,8 @@ type book struct {
 
 const bookURL = "http://opac.gzlib.gov.cn/opac/book/"
 
+var /* const */ isbnRegexp = regexp.MustCompile(`(?s)\n\s+价格.*`)
+
 func (b *book) getInfobook() {
 	resp, err := http.Get(bookURL + b.Bookrecno)
 
@@ -36,6 +38,7 @@ func (b *book) getInfobook() {
 			infoOtherThanTitle(b, s)
 		}
 	})
+
 }
 
 func infoOtherThanTitle(b *book, s *goquery.Selection) {
@@ -43,13 +46,13 @@ func infoOtherThanTitle(b *book, s *goquery.Selection) {
 
 	switch left {
 	case "ISBN:":
-		r := regexp.MustCompile(`(?s)\n\s+价格.*`)
-		isbn := r.ReplaceAllString(infoValue(s), "")
-		b.ISBN = b.ISBN + "/" + strings.TrimSpace(isbn)
+		isbn := infoValue(s)
+		isbn = isbnRegexp.ReplaceAllString(isbn, "")
+		b.ISBN = joinWithSlash(b.ISBN, strings.TrimSpace(isbn))
 	case "著者:", "主要著者:":
-		b.PrimaryAuthor = b.PrimaryAuthor + "/" + authorValue(s)
+		b.PrimaryAuthor = joinWithSlash(b.PrimaryAuthor, authorValue(s))
 	case "次要著者:":
-		b.SecondaryAuthor = b.SecondaryAuthor + "/" + authorValue(s)
+		b.SecondaryAuthor = joinWithSlash(b.SecondaryAuthor, authorValue(s))
 	}
 }
 
@@ -59,4 +62,11 @@ func infoValue(s *goquery.Selection) string {
 
 func authorValue(s *goquery.Selection) string {
 	return strings.TrimSpace(s.Find(".rightTD a").Text())
+}
+
+func joinWithSlash(existing string, appending string) string {
+	if len(existing) > 0 {
+		return existing + "/ " + appending
+	}
+	return appending
 }
