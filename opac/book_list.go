@@ -1,11 +1,28 @@
 package opac
 
-import "sync"
+import (
+	"sort"
+	"sync"
+)
 
 type bookList struct {
 	books               []*book
 	workers, result     chan *book
 	workersWg, resultWg sync.WaitGroup
+}
+
+type booksSortByNo []book
+
+func (bs booksSortByNo) Len() int {
+	return len(bs)
+}
+
+func (bs booksSortByNo) Less(i, j int) bool {
+	return bs[i].No < bs[j].No
+}
+
+func (bs booksSortByNo) Swap(i, j int) {
+	bs[i], bs[j] = bs[j], bs[i]
 }
 
 func (list *bookList) init(n int) {
@@ -42,11 +59,13 @@ func (list *bookList) done() []book {
 	close(list.result)
 	list.resultWg.Wait()
 
-	books := make([]book, 0, len(list.books))
+	books := make(booksSortByNo, 0, len(list.books))
 
 	for _, b := range list.books {
 		books = append(books, *b)
 	}
+
+	sort.Sort(books)
 
 	return books
 }
