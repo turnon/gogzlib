@@ -13,6 +13,52 @@ const searchURL = "http://opac.gzlib.gov.cn/opac/search?" +
 	"rows=10&sortWay=score&sortOrder=desc&hasholding=1&" +
 	"searchWay0=marc&logical0=AND&page=1&q="
 
+type bookList struct {
+	books               []*book
+	workers, result     chan *book
+	workersWg, resultWg sync.WaitGroup
+}
+
+func (list *bookList) init(n int) {
+	list.books = make([]*book, 0)
+	list.workers, list.result = make(chan *book), make(chan *book)
+	list.workersWg.Add(n)
+	list.resultWg.Add(1)
+
+	for ; n > 0; n-- {
+		go func() {
+			for b := range list.workers {
+				b.getBookInfo()
+				list.result <- b
+			}
+			list.workersWg.Done()
+		}()
+	}
+
+	go func() {
+		for b := range list.result {
+			list.books = append(list.books, b)
+		}
+		list.resultWg.Done()
+	}()
+}
+
+func (list *bookList) process(b *book) {
+	list.workers <- b
+}
+
+func (list *bookList) done() []book {
+	close(list.workers)
+	list.workersWg.Wait()
+	close(list.result)
+	list.resultWg.Wait()
+	books := make([]book, 0, len(list.books))
+	for _, b := range list.books {
+		books = append(books, *b)
+	}
+	return books
+}
+
 // Search from http://opac.gzlib.gov.cn/opac/search
 func Search(keyword string) {
 	resp, err := http.Get(searchURL + keyword)
@@ -29,17 +75,8 @@ func Search(keyword string) {
 		panic(err)
 	}
 
-	getBookInfoWorkers, result := makeWorker(4)
-	allBooks := make([]book, 0)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		for b := range result {
-			allBooks = append(allBooks, b)
-		}
-		wg.Done()
-	}()
+	list := bookList{}
+	list.init(2)
 
 	doc.Find(".bookmeta").Each(func(i int, s *goquery.Selection) {
 		bookrecno, exists := s.Attr("bookrecno")
@@ -48,36 +85,10 @@ func Search(keyword string) {
 			panic("no bookrecno")
 		}
 
-		getBookInfoWorkers <- book{No: i, Bookrecno: bookrecno}
+		list.process(&book{No: i, Bookrecno: bookrecno})
 	})
 
-	close(getBookInfoWorkers)
+	books := list.done()
 
-	wg.Wait()
-	fmt.Println(allBooks)
-
-}
-
-func makeWorker(n int) (chan book, chan book) {
-	in := make(chan book)
-	out := make(chan book)
-	var wg sync.WaitGroup
-	wg.Add(n)
-
-	for ; n > 0; n-- {
-		go func() {
-			for b := range in {
-				b.getBookInfo()
-				out <- b
-			}
-			wg.Done()
-		}()
-	}
-
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-
-	return in, out
+	fmt.Println(books)
 }
