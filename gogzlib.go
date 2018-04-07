@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -17,6 +18,10 @@ func main() {
 	if len(keywords) <= 0 {
 		fmt.Println("no keyword given")
 		return
+	}
+
+	for i, k := range keywords {
+		keywords[i] = url.QueryEscape(k)
 	}
 
 	keyword := strings.Join(keywords, "%20")
